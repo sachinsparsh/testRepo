@@ -1,0 +1,56 @@
+pipeline{
+    agent any
+
+    stages{
+
+        stage('checkout source code'){
+            steps{
+                cleanWs()
+                git branch: '<banch_name>', credentialsId: '<git_credentials>', url: ‘<git_url>’
+            }
+        }
+
+        stage('sonarscan'){
+            steps{
+                script{
+                def mvn = tool '<maven_version>';
+                withSonarQubeEnv('sonar') {
+                  sh "mvn clean verify sonar:sonar -Dsonar.projectKey='<sonar_projec_key>' -Dsonar.projectName='<sonar_project_name>'" 
+                }
+            }
+        }
+
+        stage('create the binaries'){
+            steps{
+                sh "mvn clean install"
+		// Optionally rename the WAR with build number
+                // sh "mv webapp/target/webapp.war webapp/target/webapp-${BUILD_NUMBER}.war"                 
+            }
+        }
+
+        stage('create image') {
+    	    steps {
+        	script {
+            		sh "docker build -t <domain>/docker-test/app-a:${BUILD_NUMBER} ."
+            		withCredentials([usernamePassword(usernameVariable: 'user', passwordVariable: 'pass', credentialsId: '<jfrog_docker_credential_id>')]) {
+                		sh "docker login -u ${user} -p ${pass} <domain>"
+           		 }
+
+            		sh "docker push <domain>/docker-test/app-a:${BUILD_NUMBER}"
+        	}
+    	   }
+        }
+
+        stage('deploy on eks'){
+            steps{
+                withAWS(credentials: '<aws_credential>', region: '<aws_region>') {
+                    sh "aws eks update-kubeconfig --region <aws_region> --name my-eks-cluster"
+                    sh "kubectl apply -f test.yaml"
+                    sleep 10
+                    sh "kubectl get all"
+                }
+            }
+        }
+
+    }
+}
