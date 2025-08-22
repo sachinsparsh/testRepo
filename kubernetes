@@ -1,15 +1,22 @@
-apiVersion: v1
-kind: Service
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: my-nodeport-service
+  name: my-nginx-deployment   # Name of the Deployment
 spec:
+  replicas: 3                 # Number of Pod replicas (desired state)
   selector:
-    app: nginx
-  ports:
-    - port: 80
-      targetPort: 8080
-      nodePort: 30036     # Optional: if not specified, one will be auto-assigned (range: 30000–32767)
-  type: NodePort
+    matchLabels:
+      app: nginx              # Deployment manages Pods with this label
+  template:
+    metadata:
+      labels:
+        app: nginx            # Labels added to the Pods
+    spec:
+      containers:
+      - name: nginx           # Container name
+        image: nginx:1.21     # Docker image version
+        ports:
+        - containerPort: 80   # Container port exposed
 
 apiVersion: v1
 kind: Service
